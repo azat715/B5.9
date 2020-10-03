@@ -26,36 +26,36 @@ class Timer:
 
 # разные декораторы
 # я постарался написать только с использованием только  итераторов и map
-def simple_stopwatch(func):
-    """
-    декоратор который считает время выполнения команды
-    """
-    @wraps(func) # декоратор который запоминает докстринг
-    def wrapper(number):
-        t = Timer.start()
-        res = func(number)
-        return (t.stop(), res)
-    return wrapper
+# def simple_stopwatch(func):
+#     """
+#     декоратор который считает время выполнения команды
+#     """
+#     @wraps(func) # декоратор который запоминает докстринг
+#     def wrapper(number):
+#         t = Timer.start()
+#         res = func(number)
+#         return (t.stop(), res)
+#     return wrapper
 
-def round_iter(func):
-    """
-    декоратор который запускает функцию десять раз 
-    """
-    @wraps(func)
-    def wrapper2(number):
-        return map(lambda _: func(number), range(10))
-    return wrapper2
+# def round_iter(func):
+#     """
+#     декоратор который запускает функцию десять раз 
+#     """
+#     @wraps(func)
+#     def wrapper2(number):
+#         return map(lambda _: func(number), range(10))
+#     return wrapper2
 
-def round_iter_arg(iters):
-    """
-    декоратор который запускает функцию iters раз 
-    """
-    def decorator(func):
-        @wraps(func)
-        def wrapper(number):
-            return map(lambda _: func(number), range(iters))
-        return wrapper
-    return decorator
+# def round_iter_arg(iters):
+#     """
+#     декоратор который запускает функцию iters раз 
+#     """
+#     def decorator(func):
+#         @wraps(func)
+#         def wrapper(number):
+#             return map(lambda _: func(number), range(iters))
+#         return wrapper
+#     return decorator
 
 
 # СМОТРЕТЬ ЗДЕСЬ
@@ -64,6 +64,14 @@ class Benchmark:
         self.iters = iters # количество итераций
         self.lap_time = None # список значений времени выполнения команды
     
+    def __enter__(self):
+        self.t2 = Timer.start()
+        return self
+    
+    def __exit__(self, exc_type, exc_value, exc_tb):
+        print(f"Прошло {self.t2.stop()} секунд")
+
+   
     def __call__(self, func):
         """
         переопределение метода 
@@ -75,6 +83,7 @@ class Benchmark:
             res, times = tee(s1) # tee клонирует итератор s1
             self.lap_time = map(lambda x: x[0], times)
             print(f"Среднее значение выполнения программы {func.__name__} в секундах {self.average_time.total_seconds()}")
+            print(f"Количество итераций {self.iters}")
             return map(lambda x: x[1], res)
         return wrapper
 
@@ -82,9 +91,9 @@ class Benchmark:
         """
         метод который считает время выполнения команды
         """
-        t = Timer.start()
+        self.t1 = Timer.start()
         res = func(*args, **kwargs)
-        return (t.stop(), res)
+        return (self.t1.stop(), res)
     
     @property
     def average_time(self):
@@ -92,19 +101,21 @@ class Benchmark:
         #  timedelta(seconds=0) - начальное значение для sum 
         return sum(self.lap_time, timedelta(seconds=0)) / self.iters
 
-@Benchmark(5)
+
+ #функции дополнительные задержки времени   
 def sleep_3s():
     """
     функция эталон - задержка 3 секунды
     """
     time.sleep(3)
+    return "Тест работы бенчмарк в контекстном режиме"
 
 """
 @lru_cache(maxsize=32) запоминает результаты работы функции 
 если включить то микросекунды, если выключить то секунды 
 maxsize - количество значений
 """
-#@lru_cache(maxsize=32)   
+@lru_cache(maxsize=32)   
 def fib(n):
     if n < 2:
         return n
@@ -122,9 +133,17 @@ def sum_even(number):
     return sum(s3) #reduce(lambda x, y: x + y, s3)
 
 if __name__ == '__main__':
-    # print(sum_even())
+    print("Вариант 1. создаются два экземпляра Benchmark один как декоратор а второй как контекстный менеджер")
     print(sum_even.__doc__) 
-    for i in sum_even(4000000):
-        print(i)
-    #print(f'Сумма четных чисел Фибоначчи до 4 млн = {sum_even(4000000)}')
-    sleep_3s()
+    with Benchmark():
+        for i in sum_even(4000000):
+            print(f"результат {i}")
+        sleep_3s()
+    
+    print("Вариант 2. один экземпляра Benchmark как контекстный менеджер")
+    print(sleep_3s.__doc__)
+    with Benchmark() as decor:
+        decor.iters = 2
+        b = decor(sleep_3s)
+        for i in b():
+            print(i)
